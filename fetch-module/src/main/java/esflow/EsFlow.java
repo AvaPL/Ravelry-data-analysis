@@ -52,7 +52,7 @@ public class EsFlow {
 
     private Fallback<Iterable<JsonNode>> getFallback(Iterable<JsonNode> documents) {
         return Fallback.of(documents) // pass documents downstream despite failing to index them
-                .onSuccess(e -> System.out.println("Passing not indexed documents downstream"));
+                .onSuccess(e -> System.out.println("Passing documents downstream"));
     }
 
     private CompletableFuture<Iterable<JsonNode>> indexDocuments(Iterable<JsonNode> documents) throws IOException {
