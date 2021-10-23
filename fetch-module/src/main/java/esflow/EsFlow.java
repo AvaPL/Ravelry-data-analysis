@@ -1,24 +1,28 @@
-package essink;
+package esflow;
 
 import akka.NotUsed;
+import akka.stream.RestartSettings;
 import akka.stream.javadsl.Flow;
+import akka.stream.javadsl.RestartFlow;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import co.elastic.clients.elasticsearch._core.BulkRequest;
 import co.elastic.clients.elasticsearch._core.BulkResponse;
 import co.elastic.clients.elasticsearch._core.bulk.Operation;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AllArgsConstructor;
-import lombok.extern.log4j.Log4j2;
-import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+import net.jodah.failsafe.Failsafe;
+import net.jodah.failsafe.Fallback;
+import net.jodah.failsafe.RetryPolicy;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// TODO: Add exception handling
-@Log4j2
 @AllArgsConstructor
 public class EsFlow {
 
@@ -28,7 +32,27 @@ public class EsFlow {
 
     public Flow<Iterable<JsonNode>, Iterable<JsonNode>, NotUsed> create() {
         return Flow.<Iterable<JsonNode>>create()
-                .mapAsync(1, this::indexDocuments);
+                .mapAsync(1, this::indexDocumentsSafe);
+    }
+
+    private CompletableFuture<Iterable<JsonNode>> indexDocumentsSafe(Iterable<JsonNode> documents) {
+        val retryPolicy = getRetryPolicy();
+        val fallback = getFallback(documents);
+        return Failsafe.with(fallback, retryPolicy).getStageAsync(() -> indexDocuments(documents));
+    }
+
+    private RetryPolicy<Iterable<JsonNode>> getRetryPolicy() {
+        return new RetryPolicy<Iterable<JsonNode>>()
+                .withBackoff(3, 30, ChronoUnit.SECONDS)
+                .withMaxRetries(5)
+                .onFailedAttempt(e -> e.getLastFailure().printStackTrace())
+                .onRetry(e -> System.out.println("Retrying bulk index [index: " + index + "]"))
+                .onRetriesExceeded(e -> System.err.println("Exceeded retries for bulk index [index: " + index + "]"));
+    }
+
+    private Fallback<Iterable<JsonNode>> getFallback(Iterable<JsonNode> documents) {
+        return Fallback.of(documents) // pass documents downstream despite failing to index them
+                .onSuccess(e -> System.out.println("Passing not indexed documents downstream"));
     }
 
     private CompletableFuture<Iterable<JsonNode>> indexDocuments(Iterable<JsonNode> documents) throws IOException {
@@ -61,7 +85,7 @@ public class EsFlow {
     private void printResponseItems(BulkResponse bulkResponse) {
         responseItemsIds(bulkResponse)
                 .forEach(id ->
-                        log.info("Indexed document [id: " + id + ", index: " + index + "]")
+                        System.out.println("Indexed document [id: " + id + ", index: " + index + "]")
                 );
     }
 

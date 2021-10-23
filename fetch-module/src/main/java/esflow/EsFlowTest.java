@@ -1,4 +1,4 @@
-package essink;
+package esflow;
 
 import akka.actor.ActorSystem;
 import akka.stream.javadsl.Sink;
@@ -32,8 +32,8 @@ public class EsFlowTest {
                 })
                 .collect(Collectors.toList());
 
-        val esSink = new EsFlow(client, "my-index", document -> document.get("id").asText());
+        val esFlow = new EsFlow(client, "my-index", document -> document.get("id").asText());
         val system = ActorSystem.create();
-        Source.single(documents).via(esSink.create()).to(Sink.ignore()).run(system);
+        Source.single(documents).via(esFlow.create()).to(Sink.ignore()).run(system);
     }
 }
