@@ -5,6 +5,7 @@ import okhttp3.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 
@@ -16,7 +17,7 @@ public class RavelryApi {
     private static final String BASE_URL = "https://api.ravelry.com/";
 
 
-    public static Future<Response> getRavelryData(String url, Map<String, String> parameters) {
+    public static CompletableFuture<Response> getRavelryData(String url, Map<String, String> parameters) {
         HttpUrl.Builder httpBuilder = HttpUrl.parse(BASE_URL + url).newBuilder();
         String credentials = Credentials.basic(username, password);
 
