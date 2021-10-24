@@ -1,9 +1,14 @@
 package raverlyapi;
 
+
 import okhttp3.*;
 
-import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+
+
 
 public class RavelryApi {
     private static final OkHttpClient client = new OkHttpClient();
@@ -12,11 +17,11 @@ public class RavelryApi {
     private static final String BASE_URL = "https://api.ravelry.com/";
 
 
-    public static ResponseBody getRavelryData(String url, Map<String, String> parameters) throws IOException {
+    public static CompletableFuture<Response> getRavelryData(String url, Map<String, String> parameters) {
         HttpUrl.Builder httpBuilder = HttpUrl.parse(BASE_URL + url).newBuilder();
         String credentials = Credentials.basic(username, password);
 
-        if (parameters != null) {
+        if (!parameters.isEmpty()) {
             for(Map.Entry<String, String> param : parameters.entrySet()) {
                 httpBuilder.addQueryParameter(param.getKey(),param.getValue());
             }
@@ -28,11 +33,13 @@ public class RavelryApi {
                 .build();
 
         Call call = client.newCall(request);
-        return call.execute().body();
+        CallbackFuture future = new CallbackFuture();
+        call.enqueue(future);
+        return future;
     }
 
-    public static ResponseBody getRavelryData(String url) throws IOException {
-        return getRavelryData(url, null);
+    public static Future<Response> getRavelryData(String url) {
+        return getRavelryData(url, new HashMap<>());
     }
 
 }
