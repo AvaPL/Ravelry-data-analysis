@@ -1,9 +1,7 @@
 package esflow;
 
 import akka.NotUsed;
-import akka.stream.RestartSettings;
 import akka.stream.javadsl.Flow;
-import akka.stream.javadsl.RestartFlow;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import co.elastic.clients.elasticsearch._core.BulkRequest;
 import co.elastic.clients.elasticsearch._core.BulkResponse;
@@ -12,14 +10,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Iterables;
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import net.jodah.failsafe.Failsafe;
 import net.jodah.failsafe.Fallback;
 import net.jodah.failsafe.RetryPolicy;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
