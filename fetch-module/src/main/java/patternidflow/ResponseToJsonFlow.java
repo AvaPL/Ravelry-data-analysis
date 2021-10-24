@@ -9,7 +9,7 @@ import okhttp3.Response;
 import java.io.IOException;
 
 
-class ResponseToJsonFlow {
+public class ResponseToJsonFlow {
 
     public Flow<Response, JsonNode, NotUsed> create() {
         return Flow.<Response>create().map(this::convert);

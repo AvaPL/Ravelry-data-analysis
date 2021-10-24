@@ -2,7 +2,6 @@ package patternidflow;
 
 import akka.actor.ActorSystem;
 import akka.stream.javadsl.Sink;
-import akka.stream.javadsl.Source;
 import lombok.val;
 import pageinfosource.PageInfoSource;
 

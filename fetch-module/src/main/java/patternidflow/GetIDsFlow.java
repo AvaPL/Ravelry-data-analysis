@@ -1,7 +1,5 @@
 package patternidflow;
 
-
-
 import akka.NotUsed;
 import akka.stream.javadsl.Flow;
 import lombok.AllArgsConstructor;
