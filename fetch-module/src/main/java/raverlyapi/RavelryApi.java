@@ -14,7 +14,7 @@ public class RavelryApi {
     private static final OkHttpClient client = new OkHttpClient();
     private static final String username = System.getenv("USERNAME");
     private static final String password = System.getenv("PASSWORD");
-    private static final String BASE_URL = "https://api.ravelry.com/";
+    private static final String BASE_URL = "https://api.ravelry.com";
 
 
     public static CompletableFuture<Response> getRavelryData(String url, Map<String, String> parameters) {
