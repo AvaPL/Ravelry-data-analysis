@@ -8,10 +8,10 @@ import akka.stream.javadsl.Source;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.common.collect.Lists;
 import lombok.val;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,9 +21,8 @@ public class ParseJsonFlowTest {
     // TODO: delete static and sout
     public static Function<JsonNode, Iterable<JsonNode>> parseJsonNodeToJsonNodes(String nodesName) {
         return jsonNode -> {
-            ArrayNode arrayNode = (ArrayNode) jsonNode.get(nodesName);
-            List<JsonNode> jsonNodeList = new ArrayList<>();
-            arrayNode.forEach(jsonNodeList::add);
+            Iterator<JsonNode> jsonNodesIterator = jsonNode.get(nodesName).elements();
+            List<JsonNode> jsonNodeList = Lists.newArrayList(jsonNodesIterator);
             System.out.println(jsonNodeList);
             return jsonNodeList;
         };
@@ -43,7 +42,7 @@ public class ParseJsonFlowTest {
     // Main for testing parsing functions.
     public static void main(String[] args) throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
-        JsonNode jsonNodeExample = mapper.readTree("""
+        JsonNode searchExample = mapper.readTree("""
                 {
                     "patterns": [
                         {
@@ -69,8 +68,34 @@ public class ParseJsonFlowTest {
                     ]
                 }""");
 
+        JsonNode patternsByIdsExample = mapper.readTree("""
+                {
+                    "patterns": {
+                        "123" : {
+                            "free": false,
+                            "id": 1,
+                            "name": "Shawlography: Westknits MKAL 2021",
+                            "first_photo": {
+                            "id": 106535972,
+                            "sort_order": 1,
+                            "x_offset": 0
+                            }
+                        },
+                        "321" : {
+                            "free": false,
+                            "id": 2,
+                            "name": "Slipstravaganza",
+                            "first_photo": {
+                            "id": 106535972,
+                            "sort_order": 1,
+                            "x_offset": 0
+                            }
+                        }
+                    }
+                }""");
+
         val flow = Flow.of(JsonNode.class).map(parseJsonNodeToPatternIds("patterns"));
         val system = ActorSystem.create();
-        Source.single(jsonNodeExample).via(flow).to(Sink.ignore()).run(system);
+        Source.single(searchExample).via(flow).to(Sink.ignore()).run(system);
     }
 }
