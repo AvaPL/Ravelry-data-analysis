@@ -4,6 +4,7 @@ import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import graphs.PatternsGraph;
 import graphs.RavelryGraphsRunner;
 import lombok.val;
+import okhttp3.OkHttpClient;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -17,8 +18,11 @@ public class Main extends RavelryGraphsRunner {
     }
 
     @Override
-    protected Collection<RunnableGraph<CompletionStage<Done>>> getGraphs(ElasticsearchAsyncClient esClient) {
-        val patternsGraph = PatternsGraph.create(esClient);
+    protected Collection<RunnableGraph<CompletionStage<Done>>> getGraphs(
+            OkHttpClient apiClient,
+            ElasticsearchAsyncClient esClient
+    ) {
+        val patternsGraph = PatternsGraph.create(apiClient, esClient);
         return Arrays.asList(patternsGraph);
     }
 }

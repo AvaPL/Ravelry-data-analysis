@@ -5,21 +5,26 @@ import akka.NotUsed;
 import akka.stream.javadsl.*;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import esflow.EsFlow;
 import lombok.val;
+import okhttp3.OkHttpClient;
 import pageinfosource.PageInfoSource;
+import util.ParseJsonFunctions;
 import pojo.PageInfo;
+import raverlyapicallflow.RavelryApiCallFlow;
 
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
 public class PatternsGraph {
-    public static RunnableGraph<CompletionStage<Done>> create(ElasticsearchAsyncClient esClient) {
+    public static RunnableGraph<CompletionStage<Done>> create(
+            OkHttpClient apiClient,
+            ElasticsearchAsyncClient esClient
+    ) {
         val pageInfoSource = getPageInfoSource();
-        val fetchPatternsFlow = getFetchPatternsFlow(); // Flow that converts PageInfo to JsonNode via HTTP call
-        val extractEntitiesFlow = getExtractEntitiesFlow(); // Flow that converts JsonNode to
-        // Iterable<JsonNode>
+        val fetchPatternsFlow = getFetchPatternsFlow(apiClient);
+        val extractEntitiesFlow = getExtractEntitiesFlow();
         val patternsToEsFlow = getPatternsToEsFlow(esClient);
         val ignoreSink = Sink.<Iterable<JsonNode>>ignore();
 
@@ -34,19 +39,20 @@ public class PatternsGraph {
         return new PageInfoSource(100, 10).create();
     }
 
-    private static Flow<PageInfo, JsonNode, NotUsed> getFetchPatternsFlow() {
-        // TODO: Mock only, replace with concrete flow
-        return Flow.of(PageInfo.class)
-                .map(pageInfo -> {
-                    val objectMapper = new ObjectMapper();
-                    return objectMapper.createObjectNode();
-                });
+    private static Flow<PageInfo, JsonNode, NotUsed> getFetchPatternsFlow(OkHttpClient apiClient) {
+        return new RavelryApiCallFlow<>(apiClient, "/patterns/search.json", PatternsGraph::pageInfoToParams).create();
+    }
+
+    private static Map<String, String> pageInfoToParams(PageInfo pageInfo) {
+        val params = new HashMap<String, String>();
+        params.put("page", pageInfo.getPageNumber().toString());
+        params.put("page_size", pageInfo.getPageLimit().toString());
+        return params;
     }
 
     private static Flow<JsonNode, Iterable<JsonNode>, NotUsed> getExtractEntitiesFlow() {
-        // TODO: Mock only, replace with concrete flow
         return Flow.of(JsonNode.class)
-                .map(jsonNode -> Collections.emptyList());
+                .map(ParseJsonFunctions.parseJsonNodeToJsonNodes("patterns"));
     }
 
     private static Flow<Iterable<JsonNode>, Iterable<JsonNode>, NotUsed> getPatternsToEsFlow(ElasticsearchAsyncClient esClient) {
