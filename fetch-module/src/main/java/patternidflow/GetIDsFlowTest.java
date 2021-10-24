@@ -11,6 +11,6 @@ class GetIDsFlowTest {
         val getIDsFlow = new GetIDsFlow("/patterns/search.json");
         val responseToJsonFlow = new ResponseToJsonFlow();
         val system = ActorSystem.create();
-        source.getSource().via(getIDsFlow.create()).via(responseToJsonFlow.create()).to(Sink.ignore()).run(system);
+        source.create().via(getIDsFlow.create()).via(responseToJsonFlow.create()).to(Sink.ignore()).run(system);
     }
 }

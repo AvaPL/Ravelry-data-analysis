@@ -9,6 +9,7 @@ import co.elastic.clients.elasticsearch._core.BulkRequest;
 import co.elastic.clients.elasticsearch._core.BulkResponse;
 import co.elastic.clients.elasticsearch._core.bulk.Operation;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Iterables;
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,8 @@ public class EsFlow {
     }
 
     private CompletableFuture<Iterable<JsonNode>> indexDocuments(Iterable<JsonNode> documents) throws IOException {
+        if (Iterables.isEmpty(documents))
+            return CompletableFuture.completedFuture(documents);
         return client.<JsonNode>bulk(builder ->
                 indexDocumentsBuilder(builder, documents)
         ).thenApply(response -> {
