@@ -17,11 +17,11 @@ public class PageInfoSource {
     private Integer numberOfRecords;
     private Integer pageLimit;
 
-    public Source<PageInfo, NotUsed> getSource() {
-        return Source.from(getPageInfos(numberOfRecords, pageLimit));
+    public Source<PageInfo, NotUsed> create() {
+        return Source.from(getPageInfos());
     }
 
-    private List<PageInfo> getPageInfos(int numberOfRecords, int pageLimit) {
+    private List<PageInfo> getPageInfos() {
         val mostPageInfos = IntStream.rangeClosed(1, numberOfRecords / pageLimit)
                 .mapToObj(x -> new PageInfo(x, pageLimit)).collect(Collectors.toList());
         val lastPageInfo = Stream.of(new PageInfo(numberOfRecords / pageLimit + 1, numberOfRecords % pageLimit))

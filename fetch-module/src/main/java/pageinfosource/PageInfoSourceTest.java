@@ -12,7 +12,7 @@ public class PageInfoSourceTest {
     // TODO: Class for testing PageInfoSource, should be deleted later
     public static void main(String[] args) {
         val system = ActorSystem.create();
-        val source = new PageInfoSource(109, 10).getSource();
+        val source = new PageInfoSource(109, 10).create();
         val flow = Flow.of(PageInfo.class).map(Object::toString);
         val sink = Sink.foreach((Procedure<String>) System.out::println);
         val graph = source.via(flow).toMat(sink, Keep.right());
