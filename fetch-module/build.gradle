@@ -23,6 +23,11 @@ dependencies {
     implementation 'co.elastic.clients:elasticsearch-java:7.15.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.3'
 
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.14.1'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.14.1'
+
+    implementation 'net.jodah:failsafe:2.4.4'
+
     implementation 'com.google.guava:guava:31.0.1-jre'
 
     compileOnly 'org.projectlombok:lombok:1.18.22'
