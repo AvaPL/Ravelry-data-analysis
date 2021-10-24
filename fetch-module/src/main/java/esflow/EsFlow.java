@@ -9,7 +9,10 @@ import co.elastic.clients.elasticsearch._core.BulkRequest;
 import co.elastic.clients.elasticsearch._core.BulkResponse;
 import co.elastic.clients.elasticsearch._core.bulk.Operation;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Iterables;
 import lombok.AllArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import net.jodah.failsafe.Failsafe;
 import net.jodah.failsafe.Fallback;
@@ -24,6 +27,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @AllArgsConstructor
+@Log4j2
 public class EsFlow {
 
     private ElasticsearchAsyncClient client;
@@ -45,17 +49,19 @@ public class EsFlow {
         return new RetryPolicy<Iterable<JsonNode>>()
                 .withBackoff(3, 30, ChronoUnit.SECONDS)
                 .withMaxRetries(5)
-                .onFailedAttempt(e -> e.getLastFailure().printStackTrace())
-                .onRetry(e -> System.out.println("Retrying bulk index [index: " + index + "]"))
-                .onRetriesExceeded(e -> System.err.println("Exceeded retries for bulk index [index: " + index + "]"));
+                .onFailedAttempt(e -> log.error("Failed bulk index [index: " + index + "]", e.getLastFailure()))
+                .onRetry(e -> log.info("Retrying bulk index [index: " + index + "]"))
+                .onRetriesExceeded(e -> log.error("Exceeded retries for bulk index [index: " + index + "]"));
     }
 
     private Fallback<Iterable<JsonNode>> getFallback(Iterable<JsonNode> documents) {
         return Fallback.of(documents) // pass documents downstream despite failing to index them
-                .onSuccess(e -> System.out.println("Passing not indexed documents downstream"));
+                .onSuccess(e -> log.debug("Passing documents downstream"));
     }
 
     private CompletableFuture<Iterable<JsonNode>> indexDocuments(Iterable<JsonNode> documents) throws IOException {
+        if (Iterables.isEmpty(documents))
+            return CompletableFuture.completedFuture(documents);
         return client.<JsonNode>bulk(builder ->
                 indexDocumentsBuilder(builder, documents)
         ).thenApply(response -> {
@@ -85,7 +91,7 @@ public class EsFlow {
     private void printResponseItems(BulkResponse bulkResponse) {
         responseItemsIds(bulkResponse)
                 .forEach(id ->
-                        System.out.println("Indexed document [id: " + id + ", index: " + index + "]")
+                        log.info("Indexed document [id: " + id + ", index: " + index + "]")
                 );
     }
 

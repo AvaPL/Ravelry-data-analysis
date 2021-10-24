@@ -23,6 +23,6 @@ class RavelryApiCallFlowTest {
         PageInfoSource source = new PageInfoSource(100, 10);
         val getIDsFlow = new RavelryApiCallFlow<>("/patterns/search.json", RavelryApiCallFlowTest::pageInfoToParams);
         val system = ActorSystem.create();
-        source.getSource().via(getIDsFlow.create()).to(Sink.ignore()).run(system);
+        source.create().via(getIDsFlow.create()).to(Sink.ignore()).run(system);
     }
 }
