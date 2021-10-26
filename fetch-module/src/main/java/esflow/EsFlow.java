@@ -7,7 +7,6 @@ import co.elastic.clients.elasticsearch._core.BulkRequest;
 import co.elastic.clients.elasticsearch._core.BulkResponse;
 import co.elastic.clients.elasticsearch._core.bulk.Operation;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Iterables;
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
@@ -17,6 +16,7 @@ import net.jodah.failsafe.RetryPolicy;
 
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -30,19 +30,19 @@ public class EsFlow {
     private String index;
     private Function<JsonNode, String> idExtractor;
 
-    public Flow<Iterable<JsonNode>, Iterable<JsonNode>, NotUsed> create() {
-        return Flow.<Iterable<JsonNode>>create()
+    public Flow<Collection<JsonNode>, Collection<JsonNode>, NotUsed> create() {
+        return Flow.<Collection<JsonNode>>create()
                 .mapAsync(1, this::indexDocumentsSafe);
     }
 
-    private CompletableFuture<Iterable<JsonNode>> indexDocumentsSafe(Iterable<JsonNode> documents) {
+    private CompletableFuture<Collection<JsonNode>> indexDocumentsSafe(Collection<JsonNode> documents) {
         val retryPolicy = getRetryPolicy();
         val fallback = getFallback(documents);
         return Failsafe.with(fallback, retryPolicy).getStageAsync(() -> indexDocuments(documents));
     }
 
-    private RetryPolicy<Iterable<JsonNode>> getRetryPolicy() {
-        return new RetryPolicy<Iterable<JsonNode>>()
+    private RetryPolicy<Collection<JsonNode>> getRetryPolicy() {
+        return new RetryPolicy<Collection<JsonNode>>()
                 .withBackoff(3, 30, ChronoUnit.SECONDS)
                 .withMaxRetries(5)
                 .onFailedAttempt(e -> log.error("Failed bulk index [index: " + index + "]", e.getLastFailure()))
@@ -50,13 +50,13 @@ public class EsFlow {
                 .onRetriesExceeded(e -> log.error("Exceeded retries for bulk index [index: " + index + "]"));
     }
 
-    private Fallback<Iterable<JsonNode>> getFallback(Iterable<JsonNode> documents) {
+    private Fallback<Collection<JsonNode>> getFallback(Collection<JsonNode> documents) {
         return Fallback.of(documents) // pass documents downstream despite failing to index them
                 .onSuccess(e -> log.debug("Passing documents downstream"));
     }
 
-    private CompletableFuture<Iterable<JsonNode>> indexDocuments(Iterable<JsonNode> documents) throws IOException {
-        if (Iterables.isEmpty(documents))
+    private CompletableFuture<Collection<JsonNode>> indexDocuments(Collection<JsonNode> documents) throws IOException {
+        if (documents.isEmpty())
             return CompletableFuture.completedFuture(documents);
         return client.<JsonNode>bulk(builder ->
                 indexDocumentsBuilder(builder, documents)
@@ -68,7 +68,7 @@ public class EsFlow {
 
     private BulkRequest.Builder<JsonNode> indexDocumentsBuilder(
             BulkRequest.Builder<JsonNode> builder,
-            Iterable<JsonNode> documents
+            Collection<JsonNode> documents
     ) {
         for (JsonNode document : documents) {
             builder
