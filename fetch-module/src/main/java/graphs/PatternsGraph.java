@@ -99,7 +99,7 @@ public class PatternsGraph {
                 .map(parseJsonNodesToYarnIds());
     }
 
-    private static Function<Collection<JsonNode>, Collection<Integer>> parseJsonNodesToYarnIds() {
+    static Function<Collection<JsonNode>, Collection<Integer>> parseJsonNodesToYarnIds() {
         return jsonNodes -> {
             Set<Integer> yarnIds = new HashSet<>();
             for (JsonNode jsonNode : jsonNodes) {
