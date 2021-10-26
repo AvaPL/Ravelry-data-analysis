@@ -8,6 +8,7 @@ import akka.stream.javadsl.*;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import esflow.EsFlow;
+import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import okhttp3.OkHttpClient;
@@ -17,12 +18,15 @@ import raverlyapicallflow.RavelryApiCallFlow;
 import scala.PartialFunction;
 import util.ParseJsonFunctions;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 @Log4j2
-public class PatternsGraph {
+public class PatternsAndYarnsGraph {
     public static RunnableGraph<CompletionStage<Done>> create(
             OkHttpClient apiClient,
             ElasticsearchAsyncClient esClient
@@ -58,7 +62,8 @@ public class PatternsGraph {
     }
 
     private static Flow<PageInfo, JsonNode, NotUsed> getFetchPatternsFlow(OkHttpClient apiClient) {
-        return new RavelryApiCallFlow<>(apiClient, "/patterns/search.json", PatternsGraph::pageInfoToParams).create();
+        return new RavelryApiCallFlow<>(apiClient, "/patterns/search.json", PatternsAndYarnsGraph::pageInfoToParams)
+                .create();
     }
 
     private static Map<String, String> pageInfoToParams(PageInfo pageInfo) {
@@ -74,7 +79,7 @@ public class PatternsGraph {
     }
 
     private static Flow<Collection<Integer>, JsonNode, NotUsed> getFetchPatternDetailsFlow(OkHttpClient apiClient) {
-        val flow = new RavelryApiCallFlow<>(apiClient, "/patterns.json", PatternsGraph::idsToParams).create();
+        val flow = new RavelryApiCallFlow<>(apiClient, "/patterns.json", PatternsAndYarnsGraph::idsToParams).create();
         return Flow.<Collection<Integer>>create()
                 .filter(c -> !c.isEmpty())
                 .via(flow);
@@ -100,19 +105,22 @@ public class PatternsGraph {
     }
 
     static Function<Collection<JsonNode>, Collection<Integer>> parseJsonNodesToYarnIds() {
-        return jsonNodes -> {
-            Set<Integer> yarnIds = new HashSet<>();
-            for (JsonNode jsonNode : jsonNodes) {
-                List<JsonNode> yarns = (List<JsonNode>) ParseJsonFunctions.parseJsonNodeToJsonNodes("packs")
-                        .apply(jsonNode);
-                yarns.forEach(jsonNode1 -> yarnIds.add(jsonNode1.get("yarn_id").asInt()));
-            }
-            return yarnIds;
-        };
+        return jsonNodes ->
+                jsonNodes.stream()
+                        .flatMap(node -> packs(node).stream())
+                        .map(node -> node.get("yarn_id"))
+                        .filter(Objects::nonNull)
+                        .map(JsonNode::asInt)
+                        .collect(Collectors.toSet());
+    }
+
+    @SneakyThrows
+    private static Collection<JsonNode> packs(JsonNode node) {
+        return ParseJsonFunctions.parseJsonNodeToJsonNodes("packs").apply(node);
     }
 
     private static Flow<Collection<Integer>, JsonNode, NotUsed> getFetchYarnsFlow(OkHttpClient apiClient) {
-        val flow = new RavelryApiCallFlow<>(apiClient, "/yarns.json", PatternsGraph::idsToParams).create();
+        val flow = new RavelryApiCallFlow<>(apiClient, "/yarns.json", PatternsAndYarnsGraph::idsToParams).create();
         return Flow.<Collection<Integer>>create()
                 .filter(c -> !c.isEmpty())
                 .via(flow);

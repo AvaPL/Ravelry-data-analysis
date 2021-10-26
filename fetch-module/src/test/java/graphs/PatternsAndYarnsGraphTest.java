@@ -9,9 +9,9 @@ import org.junit.jupiter.api.Test;
 import java.util.Collections;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class PatternsGraphTest {
+class PatternsAndYarnsGraphTest {
 
     @SneakyThrows
     @Test
@@ -37,6 +37,6 @@ class PatternsGraphTest {
                 }""");
 
         Set<Integer> expected = Set.of(27830, 46174);
-        assertEquals(expected, PatternsGraph.parseJsonNodesToYarnIds().apply(Collections.singletonList(given)));
+        assertEquals(expected, PatternsAndYarnsGraph.parseJsonNodesToYarnIds().apply(Collections.singletonList(given)));
     }
 }
