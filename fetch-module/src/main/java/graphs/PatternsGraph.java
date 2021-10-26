@@ -3,21 +3,25 @@ package graphs;
 import akka.Done;
 import akka.NotUsed;
 import akka.japi.function.Function;
+import akka.japi.pf.PFBuilder;
 import akka.stream.javadsl.*;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import esflow.EsFlow;
+import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import okhttp3.OkHttpClient;
 import pageinfosource.PageInfoSource;
 import pojo.PageInfo;
 import raverlyapicallflow.RavelryApiCallFlow;
+import scala.PartialFunction;
 import util.ParseJsonFunctions;
 
 import java.util.*;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
+@Log4j2
 public class PatternsGraph {
     public static RunnableGraph<CompletionStage<Done>> create(
             OkHttpClient apiClient,
@@ -45,6 +49,7 @@ public class PatternsGraph {
                 .via(fetchYarnsFlow)
                 .via(extractYarnEntitiesFlow)
                 .via(yarnsToEsFlow)
+                .recover(logExceptions())
                 .toMat(ignoreSink, Keep.right());
     }
 
@@ -76,7 +81,7 @@ public class PatternsGraph {
     }
 
     private static Map<String, String> idsToParams(Collection<Integer> ids) {
-        val joinedIds = ids.stream().map(id -> Integer.toString(id)).collect(Collectors.joining("+"));
+        val joinedIds = ids.stream().map(id -> Integer.toString(id)).collect(Collectors.joining(" "));
         return Map.of("ids", joinedIds);
     }
 
@@ -98,7 +103,8 @@ public class PatternsGraph {
         return jsonNodes -> {
             Set<Integer> yarnIds = new HashSet<>();
             for (JsonNode jsonNode : jsonNodes) {
-                List<JsonNode> yarns = (List<JsonNode>) ParseJsonFunctions.parseJsonNodeToJsonNodes("packs").apply(jsonNode);
+                List<JsonNode> yarns = (List<JsonNode>) ParseJsonFunctions.parseJsonNodeToJsonNodes("packs")
+                        .apply(jsonNode);
                 yarns.forEach(jsonNode1 -> yarnIds.add(jsonNode1.get("yarn_id").asInt()));
             }
             return yarnIds;
@@ -110,5 +116,14 @@ public class PatternsGraph {
         return Flow.<Collection<Integer>>create()
                 .filter(c -> !c.isEmpty())
                 .via(flow);
+    }
+
+    private static PartialFunction<Throwable, Collection<JsonNode>> logExceptions() {
+        return new PFBuilder<Throwable, Collection<JsonNode>>()
+                .match(RuntimeException.class, throwable -> {
+                    log.error("Graph failed", throwable);
+                    return Collections.emptyList();
+                })
+                .build();
     }
 }
