@@ -99,29 +99,30 @@ class ParseJsonFunctionsTest {
         assertEquals(expected, parseJsonFunctions.parseJsonNodeToIds("patterns").apply(given));
     }
 
-    @SneakyThrows
-    @Test
-    void parseJsonNodeToYarnIdsTest() {
-        // example based on a single pattern gotten from Ravelry by ids
-        JsonNode given = mapper.readTree("""
-                {
-                    "comments_count": 37,
-                    "created_at": "2021/09/01 10:00:26 -0400",
-                    "packs": [
-                        {
-                            "id": 101189144,
-                            "yarn_id": 27830,
-                            "yarn_name": "Isager Yarn Isager Alpaca 2"
-                        },
-                        {
-                            "id": 101189138,
-                            "yarn_id": 46174,
-                            "yarn_name": "Holst Garn Supersoft 100% Uld"
-                        }
-                    ]
-                }""");
-
-        Set<Integer> expected = Set.of(27830, 46174);
-        assertEquals(expected, parseJsonFunctions.parseJsonNodesToYarnIds().apply(Collections.singletonList(given)));
-    }
+    // TODO: move or delete
+//    @SneakyThrows
+//    @Test
+//    void parseJsonNodeToYarnIdsTest() {
+//        // example based on a single pattern gotten from Ravelry by ids
+//        JsonNode given = mapper.readTree("""
+//                {
+//                    "comments_count": 37,
+//                    "created_at": "2021/09/01 10:00:26 -0400",
+//                    "packs": [
+//                        {
+//                            "id": 101189144,
+//                            "yarn_id": 27830,
+//                            "yarn_name": "Isager Yarn Isager Alpaca 2"
+//                        },
+//                        {
+//                            "id": 101189138,
+//                            "yarn_id": 46174,
+//                            "yarn_name": "Holst Garn Supersoft 100% Uld"
+//                        }
+//                    ]
+//                }""");
+//
+//        Set<Integer> expected = Set.of(27830, 46174);
+//        assertEquals(expected, parseJsonFunctions.parseJsonNodesToYarnIds().apply(Collections.singletonList(given)));
+//    }
 }
