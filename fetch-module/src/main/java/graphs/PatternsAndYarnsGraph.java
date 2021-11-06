@@ -47,23 +47,25 @@ public class PatternsAndYarnsGraph {
         val extractPatternIdsFlow = getExtractPatternIdsFlow();
         val fetchPatternDetailsFlow = getFetchPatternDetailsFlow(apiClient);
         val extractPatternEntitiesFlow = getExtractEntitiesFlow("patterns");
-        val patternsToEsSink = getEntitiesToEsSink(esClient, "patterns");
+        val patternsToEsFlow = getEntitiesToEsFlow(esClient, "patterns");
         val extractYarnIdsFlow = getExtractYarnIdsFlow();
         val fetchYarnsFlow = getFetchYarnsFlow(apiClient);
         val extractYarnEntitiesFlow = getExtractEntitiesFlow("yarns");
-        val yarnsToEsSink = getEntitiesToEsSink(esClient, "yarns");
+        val yarnsToEsFlow = getEntitiesToEsFlow(esClient, "yarns");
 
         return fetchPatternsFlow
                 .via(extractPatternIdsFlow)
                 .async()
                 .via(fetchPatternDetailsFlow)
                 .via(extractPatternEntitiesFlow)
-                .alsoTo(patternsToEsSink)
+                .async()
+                .via(patternsToEsFlow)
                 .via(extractYarnIdsFlow)
                 .async()
                 .via(fetchYarnsFlow)
                 .via(extractYarnEntitiesFlow)
-                .alsoTo(yarnsToEsSink)
+                .async()
+                .via(yarnsToEsFlow)
                 .recover(logExceptions());
     }
 
@@ -125,12 +127,8 @@ public class PatternsAndYarnsGraph {
                 .map(ParseJsonFunctions.parseJsonNodeToJsonNodes(nodesListName));
     }
 
-    private static Sink<Collection<JsonNode>, NotUsed> getEntitiesToEsSink(
-            ElasticsearchAsyncClient esClient,
-            String index
-    ) {
-        val esFlow = new EsFlow(esClient, index, jsonNode -> jsonNode.get("id").asText()).create();
-        return Flow.<Collection<JsonNode>>create().async().via(esFlow).to(Sink.ignore());
+    private static Flow<Collection<JsonNode>, Collection<JsonNode>, NotUsed> getEntitiesToEsFlow(ElasticsearchAsyncClient esClient, String index) {
+        return new EsFlow(esClient, index, jsonNode -> jsonNode.get("id").asText()).create();
     }
 
     private static Flow<Collection<JsonNode>, Collection<Integer>, NotUsed> getExtractYarnIdsFlow() {
