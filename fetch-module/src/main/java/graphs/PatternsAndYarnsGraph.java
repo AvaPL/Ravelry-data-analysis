@@ -28,49 +28,63 @@ import java.util.stream.Collectors;
 
 @Log4j2
 public class PatternsAndYarnsGraph {
+
+    private static final int replicationFactor = 8;
+
     public static RunnableGraph<CompletionStage<Done>> create(
             OkHttpClient apiClient,
             ElasticsearchAsyncClient esClient
     ) {
-        val ignoreSink = Sink.<Collection<JsonNode>>ignore();
-        return RunnableGraph.fromGraph(GraphDSL.create(
-                ignoreSink,
-                (b, sink) -> {
-                    val replicationFactor = 8;
-                    val pageInfoSource = getPageInfoSource();
-                    val balance = b.add(Balance.<PageInfo>create(replicationFactor));
-                    val fetchPatternsFlow = getFetchPatternsFlow(apiClient);
-                    val extractPatternIdsFlow = getExtractPatternIdsFlow();
-                    val fetchPatternDetailsFlow = getFetchPatternDetailsFlow(apiClient);
-                    val extractPatternEntitiesFlow = getExtractEntitiesFlow("patterns");
-                    val patternsToEsFlow = getEntitiesToEsFlow(esClient, "patterns");
-                    val extractYarnIdsFlow = getExtractYarnIdsFlow();
-                    val fetchYarnsFlow = getFetchYarnsFlow(apiClient);
-                    val extractYarnEntitiesFlow = getExtractEntitiesFlow("yarns");
-                    val yarnsToEsFlow = getEntitiesToEsFlow(esClient, "yarns");
-                    val tail = fetchPatternsFlow
-                            .via(extractPatternIdsFlow)
-                            .async()
-                            .via(fetchPatternDetailsFlow)
-                            .via(extractPatternEntitiesFlow)
-                            .async()
-                            .via(patternsToEsFlow)
-                            .via(extractYarnIdsFlow)
-                            .async()
-                            .via(fetchYarnsFlow)
-                            .via(extractYarnEntitiesFlow)
-                            .async()
-                            .via(yarnsToEsFlow)
-                            .recover(logExceptions());
-                    val merge = b.add(Merge.<Collection<JsonNode>>create(replicationFactor));
+        val flow = getFlow(apiClient, esClient);
+        return buildGraph(flow);
+    }
 
-                    b.from(b.add(pageInfoSource)).viaFanOut(balance);
-                    for (int i = 0; i < replicationFactor; i++)
-                        b.from(balance).via(b.add(tail)).toFanIn(merge);
-                    b.from(merge).to(sink);
+    private static Flow<PageInfo, Collection<JsonNode>, NotUsed> getFlow(
+            OkHttpClient apiClient,
+            ElasticsearchAsyncClient esClient
+    ) {
+        val fetchPatternsFlow = getFetchPatternsFlow(apiClient);
+        val extractPatternIdsFlow = getExtractPatternIdsFlow();
+        val fetchPatternDetailsFlow = getFetchPatternDetailsFlow(apiClient);
+        val extractPatternEntitiesFlow = getExtractEntitiesFlow("patterns");
+        val patternsToEsSink = getEntitiesToEsSink(esClient, "patterns");
+        val extractYarnIdsFlow = getExtractYarnIdsFlow();
+        val fetchYarnsFlow = getFetchYarnsFlow(apiClient);
+        val extractYarnEntitiesFlow = getExtractEntitiesFlow("yarns");
+        val yarnsToEsSink = getEntitiesToEsSink(esClient, "yarns");
 
-                    return ClosedShape.getInstance();
-                }));
+        return fetchPatternsFlow
+                .via(extractPatternIdsFlow)
+                .async()
+                .via(fetchPatternDetailsFlow)
+                .via(extractPatternEntitiesFlow)
+                .alsoTo(patternsToEsSink)
+                .via(extractYarnIdsFlow)
+                .async()
+                .via(fetchYarnsFlow)
+                .via(extractYarnEntitiesFlow)
+                .alsoTo(yarnsToEsSink)
+                .recover(logExceptions());
+    }
+
+    private static RunnableGraph<CompletionStage<Done>> buildGraph(Flow<PageInfo, Collection<JsonNode>, NotUsed> flow) {
+        return RunnableGraph.fromGraph(
+                GraphDSL.create(
+                        Sink.<Collection<JsonNode>>ignore(),
+                        (b, sink) -> {
+                            val source = getPageInfoSource();
+                            val balance = b.add(Balance.<PageInfo>create(replicationFactor));
+                            val merge = b.add(Merge.<Collection<JsonNode>>create(replicationFactor));
+
+                            b.from(b.add(source)).viaFanOut(balance);
+                            for (int i = 0; i < replicationFactor; i++)
+                                b.from(balance).via(b.add(flow)).toFanIn(merge);
+                            b.from(merge).to(sink);
+
+                            return ClosedShape.getInstance();
+                        }
+                )
+        );
     }
 
     private static Source<PageInfo, NotUsed> getPageInfoSource() {
@@ -111,8 +125,12 @@ public class PatternsAndYarnsGraph {
                 .map(ParseJsonFunctions.parseJsonNodeToJsonNodes(nodesListName));
     }
 
-    private static Flow<Collection<JsonNode>, Collection<JsonNode>, NotUsed> getEntitiesToEsFlow(ElasticsearchAsyncClient esClient, String index) {
-        return new EsFlow(esClient, index, jsonNode -> jsonNode.get("id").asText()).create();
+    private static Sink<Collection<JsonNode>, NotUsed> getEntitiesToEsSink(
+            ElasticsearchAsyncClient esClient,
+            String index
+    ) {
+        val esFlow = new EsFlow(esClient, index, jsonNode -> jsonNode.get("id").asText()).create();
+        return Flow.<Collection<JsonNode>>create().async().via(esFlow).to(Sink.ignore());
     }
 
     private static Flow<Collection<JsonNode>, Collection<Integer>, NotUsed> getExtractYarnIdsFlow() {
