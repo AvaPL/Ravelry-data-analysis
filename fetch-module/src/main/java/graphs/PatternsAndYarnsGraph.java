@@ -1,5 +1,6 @@
 package graphs;
 
+import akka.Done;
 import akka.NotUsed;
 import akka.japi.function.Function;
 import akka.japi.pf.PFBuilder;
@@ -22,55 +23,58 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 @Log4j2
 public class PatternsAndYarnsGraph {
-    public static RunnableGraph<NotUsed> create(
+    public static RunnableGraph<CompletionStage<Done>> create(
             OkHttpClient apiClient,
             ElasticsearchAsyncClient esClient
     ) {
+        val ignoreSink = Sink.<Collection<JsonNode>>ignore();
+        return RunnableGraph.fromGraph(GraphDSL.create(
+                ignoreSink,
+                (b, sink) -> {
+                    val replicationFactor = 8;
+                    val pageInfoSource = getPageInfoSource();
+                    val balance = b.add(Balance.<PageInfo>create(replicationFactor));
+                    val fetchPatternsFlow = getFetchPatternsFlow(apiClient);
+                    val extractPatternIdsFlow = getExtractPatternIdsFlow();
+                    val fetchPatternDetailsFlow = getFetchPatternDetailsFlow(apiClient);
+                    val extractPatternEntitiesFlow = getExtractEntitiesFlow("patterns");
+                    val patternsToEsFlow = getEntitiesToEsFlow(esClient, "patterns");
+                    val extractYarnIdsFlow = getExtractYarnIdsFlow();
+                    val fetchYarnsFlow = getFetchYarnsFlow(apiClient);
+                    val extractYarnEntitiesFlow = getExtractEntitiesFlow("yarns");
+                    val yarnsToEsFlow = getEntitiesToEsFlow(esClient, "yarns");
+                    val tail = fetchPatternsFlow
+                            .via(extractPatternIdsFlow)
+                            .async()
+                            .via(fetchPatternDetailsFlow)
+                            .via(extractPatternEntitiesFlow)
+                            .async()
+                            .via(patternsToEsFlow)
+                            .via(extractYarnIdsFlow)
+                            .async()
+                            .via(fetchYarnsFlow)
+                            .via(extractYarnEntitiesFlow)
+                            .async()
+                            .via(yarnsToEsFlow)
+                            .recover(logExceptions());
+                    val merge = b.add(Merge.<Collection<JsonNode>>create(replicationFactor));
 
-        return RunnableGraph.fromGraph(GraphDSL.create(b -> {
-            val replicationFactor = 8;
+                    b.from(b.add(pageInfoSource)).viaFanOut(balance);
+                    for (int i = 0; i < replicationFactor; i++)
+                        b.from(balance).via(b.add(tail)).toFanIn(merge);
+                    b.from(merge).to(sink);
 
-            val pageInfoSource = getPageInfoSource();
-            val fetchPatternsFlow =  getFetchPatternsFlow(apiClient);
-            val extractPatternIdsFlow = getExtractPatternIdsFlow();
-            val fetchPatternDetailsFlow = getFetchPatternDetailsFlow(apiClient);
-            val extractPatternEntitiesFlow = getExtractEntitiesFlow("patterns");
-            val patternsToEsFlow = getEntitiesToEsFlow(esClient, "patterns");
-            val extractYarnIdsFlow = getExtractYarnIdsFlow();
-            val fetchYarnsFlow = getFetchYarnsFlow(apiClient);
-            val extractYarnEntitiesFlow = getExtractEntitiesFlow("yarns");
-            val yarnsToEsFlow = getEntitiesToEsFlow(esClient, "yarns");
-            val ignoreSink = Sink.<Collection<JsonNode>>ignore();
-            val balance = b.add(Balance.<PageInfo>create(replicationFactor));
-            val tail = b.add(
-                    fetchPatternsFlow
-                    .via(extractPatternIdsFlow)
-                    .async()
-                    .via(fetchPatternDetailsFlow)
-                    .via(extractPatternEntitiesFlow)
-                    .async()
-                    .via(patternsToEsFlow)
-                    .via(extractYarnIdsFlow)
-                    .async()
-                    .via(fetchYarnsFlow)
-                    .via(extractYarnEntitiesFlow)
-                    .async()
-                    .via(yarnsToEsFlow)
-                    .recover(logExceptions())
-                    .toMat(ignoreSink, Keep.right()));
-
-            b.from(b.add(pageInfoSource)).viaFanOut(balance).to(tail);
-
-            return ClosedShape.getInstance();
-        }));
+                    return ClosedShape.getInstance();
+                }));
     }
 
     private static Source<PageInfo, NotUsed> getPageInfoSource() {
-        return new PageInfoSource(1000, 10).create();
+        return new PageInfoSource(1000, 25).create();
     }
 
     private static Flow<PageInfo, JsonNode, NotUsed> getFetchPatternsFlow(OkHttpClient apiClient) {
