@@ -1,0 +1,26 @@
+# curl -X PUT "localhost:9200/shops" -H 'Content-Type: application/json' -d'
+#{
+#  "mappings": {
+#    "geopoint": {
+#      "field1": { "type": "geo_point" }
+#    }
+#  }
+#}
+#'
+PUT localhost:9200/shops
+Content-Type: application/json
+
+
+{
+  "mappings": {
+    "properties": {
+      "geopoint": {
+        "type": "geo_point"
+      }
+    }
+  }
+}
+
+
+###
+
