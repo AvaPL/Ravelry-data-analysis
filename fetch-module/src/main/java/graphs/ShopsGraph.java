@@ -78,7 +78,7 @@ public class ShopsGraph {
     }
 
     private static Source<PageInfo, NotUsed> getPageInfoSource() {
-        return new PageInfoSource(100, 25).create();
+        return new PageInfoSource(1000, 25).create();
     }
 
     private static Flow<PageInfo, JsonNode, NotUsed> getFetchShopsFlow(OkHttpClient apiClient) {

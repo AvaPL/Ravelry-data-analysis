@@ -23,9 +23,8 @@ public class Main extends RavelryGraphsRunner {
             OkHttpClient apiClient,
             ElasticsearchAsyncClient esClient
     ) {
-        // TODO: Uncomment
-//        val patternsAndYarnsGraph = PatternsAndYarnsGraph.create(apiClient, esClient);
+        val patternsAndYarnsGraph = PatternsAndYarnsGraph.create(apiClient, esClient);
         val shopsGraph = ShopsGraph.create(apiClient, esClient);
-        return Arrays.asList(shopsGraph);
+        return Arrays.asList(patternsAndYarnsGraph, shopsGraph);
     }
 }
