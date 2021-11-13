@@ -6,13 +6,10 @@ import akka.japi.pf.PFBuilder;
 import akka.stream.ClosedShape;
 import akka.stream.javadsl.*;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
-import co.elastic.clients.elasticsearch.indices.CreateResponse;
-import co.elastic.clients.elasticsearch.indices.PutMappingResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import esflow.EsFlow;
-import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 import lombok.val;
 import okhttp3.OkHttpClient;
@@ -20,13 +17,11 @@ import pageinfosource.PageInfoSource;
 import pojo.PageInfo;
 import raverlyapicallflow.RavelryApiCallFlow;
 import scala.PartialFunction;
-import scala.jdk.javaapi.FutureConverters;
 import util.ParseJsonFunctions;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
