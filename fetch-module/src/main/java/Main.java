@@ -3,6 +3,7 @@ import akka.stream.javadsl.RunnableGraph;
 import co.elastic.clients.elasticsearch.ElasticsearchAsyncClient;
 import graphs.PatternsAndYarnsGraph;
 import graphs.RavelryGraphsRunner;
+import graphs.ShopsGraph;
 import lombok.val;
 import okhttp3.OkHttpClient;
 
@@ -22,7 +23,9 @@ public class Main extends RavelryGraphsRunner {
             OkHttpClient apiClient,
             ElasticsearchAsyncClient esClient
     ) {
-        val patternsGraph = PatternsAndYarnsGraph.create(apiClient, esClient);
-        return Arrays.asList(patternsGraph);
+        // TODO: Uncomment
+//        val patternsAndYarnsGraph = PatternsAndYarnsGraph.create(apiClient, esClient);
+        val shopsGraph = ShopsGraph.create(apiClient, esClient);
+        return Arrays.asList(shopsGraph);
     }
 }
