@@ -41,49 +41,8 @@ public class ShopsGraph {
             OkHttpClient apiClient,
             ElasticsearchAsyncClient esClient
     ) {
-        val source = getPageInfoSource(esClient);
         val flow = getFlow(apiClient, esClient);
-        return buildGraph(source, flow);
-    }
-
-    private static Source<PageInfo, NotUsed> getPageInfoSource(ElasticsearchAsyncClient esClient) {
-        val createIndex = createEsIndex(esClient);
-        val createMapping = createEsMapping(esClient);
-        val source = new PageInfoSource(100, 25).create();
-        return Source.fromFutureSource(
-                FutureConverters.asScala(
-                        createIndex
-                                .thenCompose(r -> createMapping)
-                                .thenApply(r -> source)
-                                .exceptionally(e -> {
-                                    log.error("Initial ES requests error", e);
-                                    return Source.empty();
-                                }) // TODO: Handle exceptions
-                )
-        ).mapMaterializedValue(m -> NotUsed.getInstance());
-    }
-
-    @SneakyThrows
-    private static CompletableFuture<CreateResponse> createEsIndex(ElasticsearchAsyncClient esClient) {
-        return esClient
-                .indices()
-                .create(builder ->
-                        builder.index(index)
-                );
-    }
-
-    @SneakyThrows
-    private static CompletableFuture<PutMappingResponse> createEsMapping(ElasticsearchAsyncClient esClient) {
-        return esClient
-                .indices()
-                .putMapping(mappingBuilder ->
-                        mappingBuilder
-                                .index(index)
-                                .properties(geopointField, propertiesBuilder ->
-                                        propertiesBuilder.geoPoint(geopointBuilder -> geopointBuilder)
-                                )
-
-                );
+        return buildGraph(flow);
     }
 
     private static Flow<PageInfo, Collection<JsonNode>, NotUsed> getFlow(
@@ -93,7 +52,7 @@ public class ShopsGraph {
         val fetchShopsFlow = getFetchShopsFlow(apiClient);
         val extractShopEntitiesFlow = getExtractEntitiesFlow(index);
         val addGeopointFieldFlow = getAddGeopointFieldFlow();
-        val shopsToEsFlow = getEntitiesToEsFlow(esClient, index); // TODO: Extract index to a variable
+        val shopsToEsFlow = getEntitiesToEsFlow(esClient, index);
 
         return fetchShopsFlow
                 .async()
@@ -103,14 +62,12 @@ public class ShopsGraph {
                 .recover(logExceptions());
     }
 
-    private static RunnableGraph<CompletionStage<Done>> buildGraph(
-            Source<PageInfo, NotUsed> source,
-            Flow<PageInfo, Collection<JsonNode>, NotUsed> flow
-    ) {
+    private static RunnableGraph<CompletionStage<Done>> buildGraph(Flow<PageInfo, Collection<JsonNode>, NotUsed> flow) {
         return RunnableGraph.fromGraph(
                 GraphDSL.create(
                         Sink.<Collection<JsonNode>>ignore(),
                         (b, sink) -> {
+                            val source = getPageInfoSource();
                             val balance = b.add(Balance.<PageInfo>create(replicationFactor));
                             val merge = b.add(Merge.<Collection<JsonNode>>create(replicationFactor));
 
@@ -123,6 +80,10 @@ public class ShopsGraph {
                         }
                 )
         );
+    }
+
+    private static Source<PageInfo, NotUsed> getPageInfoSource() {
+        return new PageInfoSource(100, 25).create();
     }
 
     private static Flow<PageInfo, JsonNode, NotUsed> getFetchShopsFlow(OkHttpClient apiClient) {
